@@ -2,7 +2,7 @@ import os
 import logging
 from datetime import datetime
 from dotenv import load_dotenv
-from telegram import Update, ReplyKeyboardRemove, BotCommand, BotCommandScopeChat
+from telegram import Update, ReplyKeyboardRemove, BotCommand
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
     filters, ContextTypes, ConversationHandler
@@ -44,19 +44,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     
     # Проверяем, является ли пользователь администратором
     if user.id in ADMINS:
-        # Устанавливаем админские команды для этого пользователя
-        try:
-            admin_commands = [
-                BotCommand("show_users", "Показать всех пользователей"),
-                BotCommand("show_today", "Показать сегодняшние регистрации"),
-            ]
-            await context.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=user.id))
-        except Exception as e:
-            logger.error(f"Не удалось установить админские команды для {user.id}: {e}")
-        
         await update.message.reply_text(
             "👋 Добро пожаловать в панель администратора!\n\n"
-            "Используйте команды в меню справа от строки ввода:\n"
+            "Используйте команды:\n"
             "• /show_users - показать всех пользователей\n"
             "• /show_today - показать сегодняшние регистрации"
         )
@@ -235,20 +225,6 @@ def main() -> None:
     
     # Создаем приложение
     application = Application.builder().token(BOT_TOKEN).build()
-    
-    # Настраиваем команды меню после инициализации
-    async def post_init(application: Application) -> None:
-        try:
-            commands = [
-                BotCommand("start", "Начать работу с ботом"),
-                BotCommand("help", "Помощь по использованию бота"),
-            ]
-            await application.bot.set_my_commands(commands)
-            logger.info("Основные команды меню настроены")
-        except Exception as e:
-            logger.error(f"Ошибка при настройке команд меню: {e}")
-    
-    application.post_init = post_init
     
     # Создаем обработчик разговора для обычных пользователей
     conv_handler = ConversationHandler(
