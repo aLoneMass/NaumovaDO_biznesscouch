@@ -1,0 +1,27 @@
+[Unit]
+Description=Naumova Telegram Bot
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=telegram
+Group=telegram
+WorkingDirectory=/opt/telegram_bots/NaumovaDO_biznesscouch
+Environment=PATH=/opt/telegram_bots/NaumovaDO_biznesscouch/venv/bin
+ExecStart=/opt/telegram_bots/NaumovaDO_biznesscouch/venv/bin/python /opt/telegram_bots/NaumovaDO_biznesscouch/simple_bot.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=naumova-bot
+
+# Безопасность
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/telegram_bots/NaumovaDO_biznesscouch
+
+[Install]
+WantedBy=multi-user.target 
