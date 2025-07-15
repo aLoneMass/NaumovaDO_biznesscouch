@@ -40,25 +40,30 @@ if BOT_TOKEN and BACKUPTO:
 
 async def setup_commands(application: Application):
     """Настройка команд меню для бота"""
-    commands = [
-        BotCommand("start", "Начать работу с ботом"),
-        BotCommand("help", "Помощь по использованию бота"),
-    ]
-    
-    # Добавляем админские команды
-    admin_commands = [
-        BotCommand("show_users", "Показать всех пользователей"),
-        BotCommand("show_today", "Показать сегодняшние регистрации"),
-    ]
-    
-    await application.bot.set_my_commands(commands)
-    
-    # Устанавливаем админские команды для администраторов
-    for admin_id in ADMINS:
-        try:
-            await application.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
-        except Exception as e:
-            logger.error(f"Не удалось установить команды для админа {admin_id}: {e}")
+    try:
+        commands = [
+            BotCommand("start", "Начать работу с ботом"),
+            BotCommand("help", "Помощь по использованию бота"),
+        ]
+        
+        # Добавляем админские команды
+        admin_commands = [
+            BotCommand("show_users", "Показать всех пользователей"),
+            BotCommand("show_today", "Показать сегодняшние регистрации"),
+        ]
+        
+        await application.bot.set_my_commands(commands)
+        
+        # Устанавливаем админские команды для администраторов
+        for admin_id in ADMINS:
+            try:
+                await application.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
+            except Exception as e:
+                logger.error(f"Не удалось установить команды для админа {admin_id}: {e}")
+        
+        logger.info("Команды меню успешно настроены")
+    except Exception as e:
+        logger.error(f"Ошибка при настройке команд меню: {e}")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обработчик команды /start"""
@@ -248,8 +253,12 @@ def main() -> None:
     # Создаем приложение
     application = Application.builder().token(BOT_TOKEN).build()
     
-    # Настраиваем команды меню
-    application.job_queue.run_once(setup_commands, 0)
+    # Настраиваем команды меню при запуске
+    try:
+        import asyncio
+        asyncio.run(setup_commands(application))
+    except Exception as e:
+        logger.error(f"Ошибка при инициализации команд: {e}")
     
     # Создаем обработчик разговора для обычных пользователей
     conv_handler = ConversationHandler(
