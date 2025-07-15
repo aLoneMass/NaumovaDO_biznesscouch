@@ -55,13 +55,9 @@ async def setup_commands(application: Application):
         await application.bot.set_my_commands(commands)
         
         # Устанавливаем админские команды для администраторов
-        for admin_id in ADMINS:
-            try:
-                await application.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
-            except Exception as e:
-                logger.error(f"Не удалось установить команды для админа {admin_id}: {e}")
+        # Команды будут установлены автоматически при первом взаимодействии
+        logger.info("Основные команды меню настроены. Админские команды будут доступны после первого взаимодействия с ботом.")
         
-        logger.info("Команды меню успешно настроены")
     except Exception as e:
         logger.error(f"Ошибка при настройке команд меню: {e}")
 
@@ -71,6 +67,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     
     # Проверяем, является ли пользователь администратором
     if user.id in ADMINS:
+        # Устанавливаем админские команды для этого пользователя
+        try:
+            admin_commands = [
+                BotCommand("show_users", "Показать всех пользователей"),
+                BotCommand("show_today", "Показать сегодняшние регистрации"),
+            ]
+            await context.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=user.id))
+        except Exception as e:
+            logger.error(f"Не удалось установить админские команды для {user.id}: {e}")
+        
         await update.message.reply_text(
             "👋 Добро пожаловать в панель администратора!\n\n"
             "Используйте команды в меню справа от строки ввода:\n"
@@ -244,7 +250,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     
     await update.message.reply_text(help_text)
 
-def main() -> None:
+async def main() -> None:
     """Основная функция запуска бота"""
     if not BOT_TOKEN:
         logger.error("Не указан токен бота в переменной BOT_TOKEN")
@@ -255,8 +261,7 @@ def main() -> None:
     
     # Настраиваем команды меню при запуске
     try:
-        import asyncio
-        asyncio.run(setup_commands(application))
+        await setup_commands(application)
     except Exception as e:
         logger.error(f"Ошибка при инициализации команд: {e}")
     
@@ -294,7 +299,8 @@ def main() -> None:
     
     # Запускаем бота
     print("🤖 Бот запущен...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    await application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
-    main() 
+    import asyncio
+    asyncio.run(main()) 
