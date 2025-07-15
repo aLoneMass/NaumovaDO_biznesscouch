@@ -2,14 +2,14 @@ import os
 import logging
 from datetime import datetime
 from dotenv import load_dotenv
-from telegram import Update, ReplyKeyboardRemove
+from telegram import Update, ReplyKeyboardRemove, BotCommand, BotCommandScopeChat
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
     filters, ContextTypes, ConversationHandler
 )
 
 from database import Database
-from keyboards import get_contact_keyboard, get_request_actions_keyboard, get_admin_keyboard
+from keyboards import get_contact_keyboard, get_request_actions_keyboard
 from backup_service import BackupService
 
 # Загрузка переменных окружения
@@ -38,6 +38,28 @@ backup_service = None
 if BOT_TOKEN and BACKUPTO:
     backup_service = BackupService(BOT_TOKEN, BACKUPTO)
 
+async def setup_commands(application: Application):
+    """Настройка команд меню для бота"""
+    commands = [
+        BotCommand("start", "Начать работу с ботом"),
+        BotCommand("help", "Помощь по использованию бота"),
+    ]
+    
+    # Добавляем админские команды
+    admin_commands = [
+        BotCommand("show_users", "Показать всех пользователей"),
+        BotCommand("show_today", "Показать сегодняшние регистрации"),
+    ]
+    
+    await application.bot.set_my_commands(commands)
+    
+    # Устанавливаем админские команды для администраторов
+    for admin_id in ADMINS:
+        try:
+            await application.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
+        except Exception as e:
+            logger.error(f"Не удалось установить команды для админа {admin_id}: {e}")
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обработчик команды /start"""
     user = update.effective_user
@@ -45,8 +67,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Проверяем, является ли пользователь администратором
     if user.id in ADMINS:
         await update.message.reply_text(
-            "👋 Добро пожаловать в панель администратора!",
-            reply_markup=get_admin_keyboard()
+            "👋 Добро пожаловать в панель администратора!\n\n"
+            "Используйте команды в меню справа от строки ввода:\n"
+            "• /show_users - показать всех пользователей\n"
+            "• /show_today - показать сегодняшние регистрации"
         )
         return ConversationHandler.END
     
@@ -123,8 +147,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     query = update.callback_query
     await query.answer()
     
-    user = update.effective_user
-    
     if query.data == "change_request":
         await query.edit_message_text(
             "Пожалуйста, введите новый запрос в свободной форме.\n"
@@ -136,61 +158,86 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     elif query.data == "finish":
         await query.edit_message_text("✅ Спасибо за обращение! До свидания!")
         return ConversationHandler.END
-    
-    # Обработка админских команд
-    elif user.id in ADMINS:
-        if query.data == "show_all_users":
-            users = db.get_all_users()
-            if users:
-                message = "👥 Все пользователи:\n\n"
-                for user_data in users:
-                    message += f"ID: {user_data[1]}\n"
-                    message += f"Имя: {user_data[2]} {user_data[3] or ''}\n"
-                    message += f"Телефон: {user_data[4]}\n"
-                    message += f"Регистрация: {user_data[5]}\n"
-                    message += f"Запрос: {user_data[6] or 'Не указан'}\n"
-                    message += "─" * 30 + "\n"
-                
-                # Разбиваем на части, если сообщение слишком длинное
-                if len(message) > 4096:
-                    for i in range(0, len(message), 4096):
-                        await query.message.reply_text(message[i:i+4096])
-                else:
-                    await query.message.reply_text(message)
-            else:
-                await query.message.reply_text("📭 Пользователей пока нет.")
-        
-        elif query.data == "show_today":
-            users = db.get_today_registrations()
-            if users:
-                message = f"📅 Регистрации за {datetime.now().strftime('%d.%m.%Y')}:\n\n"
-                for user_data in users:
-                    message += f"ID: {user_data[1]}\n"
-                    message += f"Имя: {user_data[2]} {user_data[3] or ''}\n"
-                    message += f"Телефон: {user_data[4]}\n"
-                    message += f"Время: {user_data[5]}\n"
-                    message += f"Запрос: {user_data[6] or 'Не указан'}\n"
-                    message += "─" * 30 + "\n"
-                
-                if len(message) > 4096:
-                    for i in range(0, len(message), 4096):
-                        await query.message.reply_text(message[i:i+4096])
-                else:
-                    await query.message.reply_text(message)
-            else:
-                await query.message.reply_text("📭 Сегодня новых регистраций нет.")
 
-async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Обработчик команды /admin для администраторов"""
+async def show_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Команда для показа всех пользователей"""
+    user = update.effective_user
+    
+    if user.id not in ADMINS:
+        await update.message.reply_text("❌ У вас нет доступа к этой команде.")
+        return
+    
+    users = db.get_all_users()
+    if users:
+        message = "👥 Все пользователи:\n\n"
+        for user_data in users:
+            message += f"ID: {user_data[1]}\n"
+            message += f"Имя: {user_data[2]} {user_data[3] or ''}\n"
+            message += f"Телефон: {user_data[4]}\n"
+            message += f"Регистрация: {user_data[5]}\n"
+            message += f"Запрос: {user_data[6] or 'Не указан'}\n"
+            message += "─" * 30 + "\n"
+        
+        # Разбиваем на части, если сообщение слишком длинное
+        if len(message) > 4096:
+            for i in range(0, len(message), 4096):
+                await update.message.reply_text(message[i:i+4096])
+        else:
+            await update.message.reply_text(message)
+    else:
+        await update.message.reply_text("📭 Пользователей пока нет.")
+
+async def show_today_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Команда для показа сегодняшних регистраций"""
+    user = update.effective_user
+    
+    if user.id not in ADMINS:
+        await update.message.reply_text("❌ У вас нет доступа к этой команде.")
+        return
+    
+    users = db.get_today_registrations()
+    if users:
+        message = f"📅 Регистрации за {datetime.now().strftime('%d.%m.%Y')}:\n\n"
+        for user_data in users:
+            message += f"ID: {user_data[1]}\n"
+            message += f"Имя: {user_data[2]} {user_data[3] or ''}\n"
+            message += f"Телефон: {user_data[4]}\n"
+            message += f"Время: {user_data[5]}\n"
+            message += f"Запрос: {user_data[6] or 'Не указан'}\n"
+            message += "─" * 30 + "\n"
+        
+        if len(message) > 4096:
+            for i in range(0, len(message), 4096):
+                await update.message.reply_text(message[i:i+4096])
+        else:
+            await update.message.reply_text(message)
+    else:
+        await update.message.reply_text("📭 Сегодня новых регистраций нет.")
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Команда помощи"""
     user = update.effective_user
     
     if user.id in ADMINS:
-        await update.message.reply_text(
-            "👋 Панель администратора",
-            reply_markup=get_admin_keyboard()
+        help_text = (
+            "🤖 Помощь по командам бота:\n\n"
+            "Для администраторов:\n"
+            "• /show_users - показать всех пользователей\n"
+            "• /show_today - показать сегодняшние регистрации\n"
+            "• /help - показать эту справку\n\n"
+            "Для пользователей:\n"
+            "• /start - начать работу с ботом"
         )
     else:
-        await update.message.reply_text("❌ У вас нет доступа к панели администратора.")
+        help_text = (
+            "🤖 Помощь по использованию бота:\n\n"
+            "1. Нажмите /start для начала работы\n"
+            "2. Поделитесь контактом\n"
+            "3. Отправьте ваш запрос (текст, фото, голосовое или видеокружок)\n"
+            "4. При необходимости измените запрос или завершите работу"
+        )
+    
+    await update.message.reply_text(help_text)
 
 def main() -> None:
     """Основная функция запуска бота"""
@@ -200,6 +247,9 @@ def main() -> None:
     
     # Создаем приложение
     application = Application.builder().token(BOT_TOKEN).build()
+    
+    # Настраиваем команды меню
+    application.job_queue.run_once(setup_commands, 0)
     
     # Создаем обработчик разговора для обычных пользователей
     conv_handler = ConversationHandler(
@@ -225,7 +275,9 @@ def main() -> None:
     # Добавляем обработчики
     application.add_handler(conv_handler)
     application.add_handler(CallbackQueryHandler(handle_callback))
-    application.add_handler(CommandHandler("admin", admin_command))
+    application.add_handler(CommandHandler("show_users", show_users_command))
+    application.add_handler(CommandHandler("show_today", show_today_command))
+    application.add_handler(CommandHandler("help", help_command))
     
     # Запускаем сервис резервных копий
     if backup_service:

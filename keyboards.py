@@ -15,14 +15,4 @@ def get_request_actions_keyboard():
             InlineKeyboardButton("✅ Завершить", callback_data="finish")
         ]
     ]
-    return InlineKeyboardMarkup(keyboard)
-
-def get_admin_keyboard():
-    """Клавиатура для администраторов"""
-    keyboard = [
-        [
-            InlineKeyboardButton("👥 Показать всех пользователей", callback_data="show_all_users"),
-            InlineKeyboardButton("📅 Показать сегодняшние регистрации", callback_data="show_today")
-        ]
-    ]
     return InlineKeyboardMarkup(keyboard) 
