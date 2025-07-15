@@ -104,19 +104,30 @@ async def handle_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user = update.effective_user
     
     # Определяем тип контента и формируем описание
+    request_type = None
+    file_id = None
+    
     if update.message.text:
         request_content = f"Текст: {update.message.text}"
+        request_type = "text"
     elif update.message.photo:
         request_content = f"Фото: {update.message.caption or 'Без описания'}"
+        request_type = "photo"
+        file_id = update.message.photo[-1].file_id  # Берем последнее (самое качественное) фото
     elif update.message.voice:
         request_content = f"Голосовое сообщение: {update.message.caption or 'Без описания'}"
+        request_type = "voice"
+        file_id = update.message.voice.file_id
     elif update.message.video_note:
         request_content = f"Видеокружок: {update.message.caption or 'Без описания'}"
+        request_type = "video_note"
+        file_id = update.message.video_note.file_id
     else:
         request_content = "Неизвестный тип контента"
+        request_type = "unknown"
     
     # Сохраняем запрос в базу данных
-    success = db.update_user_request(user.id, request_content)
+    success = db.update_user_request(user.id, request_content, request_type, file_id)
     
     if success:
         await update.message.reply_text(

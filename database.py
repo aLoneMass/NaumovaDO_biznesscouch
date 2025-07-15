@@ -20,7 +20,9 @@ class Database:
                     last_name TEXT,
                     phone TEXT,
                     registration_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    request TEXT
+                    request TEXT,
+                    request_type TEXT,
+                    file_id TEXT
                 )
             ''')
             conn.commit()
@@ -40,14 +42,14 @@ class Database:
             print(f"Ошибка при добавлении пользователя: {e}")
             return False
     
-    def update_user_request(self, telegram_id: int, request: str) -> bool:
+    def update_user_request(self, telegram_id: int, request: str, request_type: str = None, file_id: str = None) -> bool:
         """Обновление запроса пользователя"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute('''
-                    UPDATE users SET request = ? WHERE telegram_id = ?
-                ''', (request, telegram_id))
+                    UPDATE users SET request = ?, request_type = ?, file_id = ? WHERE telegram_id = ?
+                ''', (request, request_type, file_id, telegram_id))
                 conn.commit()
                 return cursor.rowcount > 0
         except Exception as e:

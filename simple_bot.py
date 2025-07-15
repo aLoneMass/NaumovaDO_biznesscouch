@@ -94,19 +94,30 @@ async def handle_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user = update.effective_user
     
     # Определяем тип контента и формируем описание
+    request_type = None
+    file_id = None
+    
     if update.message.text:
         request_content = f"Текст: {update.message.text}"
+        request_type = "text"
     elif update.message.photo:
         request_content = f"Фото: {update.message.caption or 'Без описания'}"
+        request_type = "photo"
+        file_id = update.message.photo[-1].file_id  # Берем последнее (самое качественное) фото
     elif update.message.voice:
         request_content = f"Голосовое сообщение: {update.message.caption or 'Без описания'}"
+        request_type = "voice"
+        file_id = update.message.voice.file_id
     elif update.message.video_note:
         request_content = f"Видеокружок: {update.message.caption or 'Без описания'}"
+        request_type = "video_note"
+        file_id = update.message.video_note.file_id
     else:
         request_content = "Неизвестный тип контента"
+        request_type = "unknown"
     
     # Сохраняем запрос в базу данных
-    success = db.update_user_request(user.id, request_content)
+    success = db.update_user_request(user.id, request_content, request_type, file_id)
     
     if success:
         await update.message.reply_text(
@@ -154,6 +165,11 @@ async def show_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
             message += f"Телефон: {user_data[4]}\n"
             message += f"Регистрация: {user_data[5]}\n"
             message += f"Запрос: {user_data[6] or 'Не указан'}\n"
+            
+            # Добавляем информацию о типе контента
+            if user_data[7]:  # request_type
+                message += f"Тип контента: {user_data[7]}\n"
+            
             message += "─" * 30 + "\n"
         
         # Разбиваем на части, если сообщение слишком длинное
@@ -162,6 +178,9 @@ async def show_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 await update.message.reply_text(message[i:i+4096])
         else:
             await update.message.reply_text(message)
+        
+        # Отправляем медиафайлы отдельно
+        await send_media_files(context.bot, update.message.chat_id, users)
     else:
         await update.message.reply_text("📭 Пользователей пока нет.")
 
@@ -182,6 +201,11 @@ async def show_today_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
             message += f"Телефон: {user_data[4]}\n"
             message += f"Время: {user_data[5]}\n"
             message += f"Запрос: {user_data[6] or 'Не указан'}\n"
+            
+            # Добавляем информацию о типе контента
+            if user_data[7]:  # request_type
+                message += f"Тип контента: {user_data[7]}\n"
+            
             message += "─" * 30 + "\n"
         
         if len(message) > 4096:
@@ -189,8 +213,33 @@ async def show_today_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 await update.message.reply_text(message[i:i+4096])
         else:
             await update.message.reply_text(message)
+        
+        # Отправляем медиафайлы отдельно
+        await send_media_files(context.bot, update.message.chat_id, users)
     else:
         await update.message.reply_text("📭 Сегодня новых регистраций нет.")
+
+async def send_media_files(bot, chat_id, users):
+    """Отправка медиафайлов администратору"""
+    for user_data in users:
+        if user_data[8]:  # file_id
+            try:
+                caption = f"📎 Медиафайл от пользователя {user_data[2]} {user_data[3] or ''} (ID: {user_data[1]})"
+                
+                if user_data[7] == "photo":
+                    await bot.send_photo(chat_id=chat_id, photo=user_data[8], caption=caption)
+                elif user_data[7] == "voice":
+                    await bot.send_voice(chat_id=chat_id, voice=user_data[8], caption=caption)
+                elif user_data[7] == "video_note":
+                    await bot.send_video_note(chat_id=chat_id, video_note=user_data[8])
+                    await bot.send_message(chat_id=chat_id, text=caption)
+                
+                # Небольшая задержка между отправками
+                import asyncio
+                await asyncio.sleep(0.5)
+                
+            except Exception as e:
+                logger.error(f"Ошибка при отправке медиафайла для пользователя {user_data[1]}: {e}")
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Команда помощи"""
