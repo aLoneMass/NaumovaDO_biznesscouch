@@ -63,7 +63,15 @@ sudo ./deploy.sh stop
 
 # Обновление файлов
 sudo ./deploy.sh update
-```
+
+# Настройка ограничения логов (10 МБ)
+sudo ./deploy.sh setup-logging
+
+# Просмотр размера логов
+sudo ./deploy.sh logs-size
+
+# Очистка старых логов
+sudo ./deploy.sh logs-clean
 
 ### Вариант 2: Ручная установка
 

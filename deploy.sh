@@ -64,6 +64,20 @@ case "$1" in
         echo "📋 Все логи службы:"
         sudo journalctl -u "$SERVICE_NAME" --no-pager
         ;;
+    "logs-size")
+        echo "📊 Размер логов службы:"
+        sudo journalctl -u "$SERVICE_NAME" --disk-usage
+        ;;
+    "logs-clean")
+        echo "🧹 Очистка старых логов..."
+        sudo journalctl --vacuum-size=10M
+        sudo journalctl --vacuum-time=7d
+        echo "✅ Логи очищены!"
+        ;;
+    "setup-logging")
+        echo "📋 Настройка ограничения логов..."
+        sudo ./setup_logging.sh
+        ;;
     "uninstall")
         echo "🗑️  Удаление Naumova Telegram Bot..."
         sudo ./uninstall_service.sh
@@ -82,6 +96,9 @@ case "$1" in
         echo "  status     - Показать статус службы"
         echo "  logs       - Показать логи в реальном времени"
         echo "  logs-all   - Показать все логи"
+        echo "  logs-size  - Показать размер логов"
+        echo "  logs-clean - Очистить старые логи"
+        echo "  setup-logging - Настроить ограничение логов"
         echo "  uninstall  - Удалить бота и службу"
         echo ""
         echo "Примеры:"
