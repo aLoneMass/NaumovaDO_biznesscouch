@@ -30,6 +30,9 @@ class Database:
     def add_user(self, telegram_id: int, first_name: str, last_name: str, phone: str) -> bool:
         """Добавление нового пользователя"""
         try:
+            print(f"Попытка добавления пользователя: ID={telegram_id}, Имя={first_name}, Фамилия={last_name}, Телефон={phone}")
+            print(f"Путь к БД: {os.path.abspath(self.db_path)}")
+            
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute('''
@@ -37,9 +40,12 @@ class Database:
                     VALUES (?, ?, ?, ?)
                 ''', (telegram_id, first_name, last_name, phone))
                 conn.commit()
+                print(f"Пользователь успешно добавлен/обновлен: {telegram_id}")
                 return True
         except Exception as e:
             print(f"Ошибка при добавлении пользователя: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def update_user_request(self, telegram_id: int, request: str, request_type: str = None, file_id: str = None) -> bool:

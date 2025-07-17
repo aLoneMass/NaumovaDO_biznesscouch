@@ -76,6 +76,8 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user = update.effective_user
     contact = update.message.contact
     
+    logger.info(f"Получен контакт от пользователя {user.id}: {contact.first_name} {contact.last_name}, телефон: {contact.phone_number}")
+    
     # Сохраняем пользователя в базу данных
     success = db.add_user(
         telegram_id=user.id,
@@ -83,6 +85,8 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         last_name=contact.last_name or user.last_name,
         phone=contact.phone_number
     )
+    
+    logger.info(f"Результат сохранения контакта для пользователя {user.id}: {'успешно' if success else 'ошибка'}")
     
     if success:
         await update.message.reply_text(
