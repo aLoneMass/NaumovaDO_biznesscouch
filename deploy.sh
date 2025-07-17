@@ -2,7 +2,7 @@
 
 # Скрипт для развертывания и управления Telegram ботом Наумовой
 
-BOT_DIR="/home/telegram/naumova-bot"
+BOT_DIR="/opt/telegram_bots/NaumovaDO_biznesscouch"
 SERVICE_NAME="naumova-bot"
 
 # Цвета для вывода
@@ -48,7 +48,7 @@ install() {
     
     # Копирование файлов
     log "Копирование файлов..."
-    cp -r . $BOT_DIR/
+    cp -r * $BOT_DIR/
     chown -R telegram:telegram $BOT_DIR
     
     # Установка зависимостей
@@ -198,7 +198,7 @@ update() {
     fi
     
     # Копирование новых файлов
-    cp -r . $BOT_DIR/
+    cp -r * $BOT_DIR/
     chown -R telegram:telegram $BOT_DIR
     
     # Установка зависимостей
