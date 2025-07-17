@@ -78,6 +78,11 @@ case "$1" in
         echo "📋 Настройка ограничения логов..."
         sudo ./setup_logging.sh
         ;;
+    "test-backup")
+        echo "🧪 Тестирование резервных копий..."
+        cd /opt/telegram_bots/NaumovaDO_biznesscouch
+        sudo -u telegram venv/bin/python test_backup.py
+        ;;
     "uninstall")
         echo "🗑️  Удаление Naumova Telegram Bot..."
         sudo ./uninstall_service.sh
@@ -99,6 +104,7 @@ case "$1" in
         echo "  logs-size  - Показать размер логов"
         echo "  logs-clean - Очистить старые логи"
         echo "  setup-logging - Настроить ограничение логов"
+        echo "  test-backup - Тестировать резервные копии"
         echo "  uninstall  - Удалить бота и службу"
         echo ""
         echo "Примеры:"

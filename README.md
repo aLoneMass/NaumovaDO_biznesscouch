@@ -73,6 +73,9 @@ sudo ./deploy.sh logs-size
 # Очистка старых логов
 sudo ./deploy.sh logs-clean
 
+# Тестирование резервных копий
+sudo ./deploy.sh test-backup
+
 ### Вариант 2: Ручная установка
 
 #### 1. Установка зависимостей
