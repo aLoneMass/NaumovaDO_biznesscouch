@@ -51,9 +51,13 @@ install() {
     cp -r * $BOT_DIR/
     chown -R telegram:telegram $BOT_DIR
     
-    # Установка зависимостей
+    # Создание виртуального окружения
+    log "Создание виртуального окружения..."
+    sudo -u telegram bash -c "cd $BOT_DIR && python3 -m venv venv"
+    
+    # Установка зависимостей в виртуальное окружение
     log "Установка зависимостей Python..."
-    sudo -u telegram bash -c "cd $BOT_DIR && pip3 install -r requirements.txt"
+    sudo -u telegram bash -c "cd $BOT_DIR && venv/bin/pip install -r requirements.txt"
     
     # Создание файла службы systemd
     cat > /etc/systemd/system/$SERVICE_NAME.service << EOF
@@ -66,7 +70,7 @@ Type=simple
 User=telegram
 WorkingDirectory=$BOT_DIR
 Environment=PATH=$BOT_DIR/venv/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=/usr/bin/python3 $BOT_DIR/bot.py
+ExecStart=$BOT_DIR/venv/bin/python $BOT_DIR/bot.py
 Restart=always
 RestartSec=10
 
@@ -197,12 +201,27 @@ update() {
         log "Создана резервная копия"
     fi
     
-    # Копирование новых файлов
-    cp -r * $BOT_DIR/
-    chown -R telegram:telegram $BOT_DIR
+    # Определяем текущую директорию (откуда запускается скрипт)
+    CURRENT_DIR=$(pwd)
     
-    # Установка зависимостей
-    sudo -u telegram bash -c "cd $BOT_DIR && pip3 install -r requirements.txt"
+    # Копирование новых файлов (только если мы не в целевой директории)
+    if [ "$CURRENT_DIR" != "$BOT_DIR" ]; then
+        log "Копирование файлов из $CURRENT_DIR в $BOT_DIR..."
+        cp -r * $BOT_DIR/
+        chown -R telegram:telegram $BOT_DIR
+    else
+        log "Обновление в текущей директории"
+    fi
+    
+    # Создание виртуального окружения если его нет
+    if [ ! -d "$BOT_DIR/venv" ]; then
+        log "Создание виртуального окружения..."
+        sudo -u telegram bash -c "cd $BOT_DIR && python3 -m venv venv"
+    fi
+    
+    # Установка зависимостей в виртуальное окружение
+    log "Установка зависимостей в виртуальное окружение..."
+    sudo -u telegram bash -c "cd $BOT_DIR && venv/bin/pip install -r requirements.txt"
     
     # Запуск службы
     systemctl start $SERVICE_NAME
@@ -214,13 +233,28 @@ update() {
 # Проверка базы данных
 check_db() {
     log "Проверка базы данных..."
-    sudo -u telegram bash -c "cd $BOT_DIR && python3 check_db.py"
+    sudo -u telegram bash -c "cd $BOT_DIR && venv/bin/python check_db.py"
+}
+
+# Установка зависимостей
+install_deps() {
+    log "Установка Python зависимостей..."
+    
+    # Создание виртуального окружения если его нет
+    if [ ! -d "$BOT_DIR/venv" ]; then
+        log "Создание виртуального окружения..."
+        sudo -u telegram bash -c "cd $BOT_DIR && python3 -m venv venv"
+    fi
+    
+    # Установка зависимостей в виртуальное окружение
+    sudo -u telegram bash -c "cd $BOT_DIR && venv/bin/pip install -r requirements.txt"
+    log "Зависимости установлены"
 }
 
 # Тестирование резервного копирования
 test_backup() {
     log "Тестирование резервного копирования..."
-    sudo -u telegram bash -c "cd $BOT_DIR && python3 test_backup.py"
+    sudo -u telegram bash -c "cd $BOT_DIR && venv/bin/python test_backup.py"
 }
 
 # Очистка логов
@@ -244,6 +278,7 @@ show_help() {
     echo "  status      - Показать статус службы"
     echo "  logs        - Показать логи в реальном времени"
     echo "  update      - Обновить бота"
+    echo "  install-deps- Установить Python зависимости"
     echo "  check-db    - Проверить состояние базы данных"
     echo "  test-backup - Протестировать резервное копирование"
     echo "  clean-logs  - Очистить старые логи"
@@ -288,6 +323,10 @@ case "$1" in
     update)
         check_sudo
         update
+        ;;
+    install-deps)
+        check_sudo
+        install_deps
         ;;
     check-db)
         check_db
