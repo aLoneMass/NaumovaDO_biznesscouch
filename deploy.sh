@@ -195,22 +195,23 @@ update() {
     # Остановка службы
     systemctl stop $SERVICE_NAME
     
-    # Резервная копия
-    if [ -d "$BOT_DIR" ]; then
-        cp -r $BOT_DIR ${BOT_DIR}_backup_$(date +%Y%m%d_%H%M%S)
-        log "Создана резервная копия"
-    fi
-    
     # Определяем текущую директорию (откуда запускается скрипт)
     CURRENT_DIR=$(pwd)
     
     # Копирование новых файлов (только если мы не в целевой директории)
     if [ "$CURRENT_DIR" != "$BOT_DIR" ]; then
+        # Резервная копия только при реальном обновлении
+        if [ -d "$BOT_DIR" ]; then
+            cp -r $BOT_DIR ${BOT_DIR}_backup_$(date +%Y%m%d_%H%M%S)
+            log "Создана резервная копия"
+        fi
+        
         log "Копирование файлов из $CURRENT_DIR в $BOT_DIR..."
         cp -r * $BOT_DIR/
         chown -R telegram:telegram $BOT_DIR
     else
-        log "Обновление в текущей директории"
+        log "⚠️ Обновление из целевой директории - пропускаем копирование файлов"
+        log "Для обновления запустите команду из директории с исходными файлами"
     fi
     
     # Создание виртуального окружения если его нет
@@ -260,7 +261,12 @@ test_backup() {
 # Проверка времени и планировщика
 check_backup_time() {
     log "Проверка времени и планировщика резервного копирования..."
-    sudo -u telegram bash -c "cd $BOT_DIR && venv/bin/python check_backup_time.py"
+    if [ -f "$BOT_DIR/check_backup_time.py" ]; then
+        sudo -u telegram bash -c "cd $BOT_DIR && venv/bin/python check_backup_time.py"
+    else
+        log "❌ Файл check_backup_time.py не найден"
+        log "Выполните обновление из директории с исходными файлами"
+    fi
 }
 
 # Очистка логов
@@ -268,6 +274,20 @@ clean_logs() {
     log "Очистка логов..."
     journalctl --vacuum-time=1d --unit=$SERVICE_NAME
     log "Логи очищены"
+}
+
+# Очистка старых бэкапов
+clean_backups() {
+    log "Очистка старых бэкапов..."
+    cd /opt/telegram_bots
+    BACKUP_COUNT=$(ls -1 | grep "NaumovaDO_biznesscouch_backup" | wc -l)
+    if [ $BACKUP_COUNT -gt 3 ]; then
+        # Оставляем только 3 последних бэкапа
+        ls -t | grep "NaumovaDO_biznesscouch_backup" | tail -n +4 | xargs rm -rf
+        log "Удалено $(($BACKUP_COUNT - 3)) старых бэкапов"
+    else
+        log "Старых бэкапов для удаления нет"
+    fi
 }
 
 # Показать справку
@@ -289,6 +309,7 @@ show_help() {
     echo "  test-backup - Протестировать резервное копирование"
     echo "  check-time  - Проверить время и планировщик"
     echo "  clean-logs  - Очистить старые логи"
+    echo "  clean-backups - Очистить старые бэкапы"
     echo "  help        - Показать эту справку"
     echo ""
     echo "Примеры:"
@@ -346,6 +367,10 @@ case "$1" in
         ;;
     clean-logs)
         clean_logs
+        ;;
+    clean-backups)
+        check_sudo
+        clean_backups
         ;;
     help|--help|-h)
         show_help
