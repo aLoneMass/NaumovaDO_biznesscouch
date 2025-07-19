@@ -1,6 +1,7 @@
 import schedule
 import time
 import threading
+import asyncio
 from datetime import datetime
 from telegram import Bot
 from database import Database
@@ -21,13 +22,22 @@ class BackupService:
                     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                     filename = f"naumovado_backup_{timestamp}.db"
                     
-                    self.bot.send_document(
-                        chat_id=self.backup_to_id,
-                        document=db_file,
-                        filename=filename,
-                        caption=f"📊 Резервная копия базы данных\n📅 Дата: {datetime.now().strftime('%d.%m.%Y %H:%M')}"
-                    )
-                    print(f"Резервная копия отправлена: {filename}")
+                    # Создаем новый event loop для асинхронной отправки
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    
+                    try:
+                        loop.run_until_complete(
+                            self.bot.send_document(
+                                chat_id=self.backup_to_id,
+                                document=db_file,
+                                filename=filename,
+                                caption=f"📊 Резервная копия базы данных\n📅 Дата: {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+                            )
+                        )
+                        print(f"Резервная копия отправлена: {filename}")
+                    finally:
+                        loop.close()
             else:
                 print("Файл базы данных не найден")
         except Exception as e:
