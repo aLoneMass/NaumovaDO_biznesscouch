@@ -257,6 +257,12 @@ test_backup() {
     sudo -u telegram bash -c "cd $BOT_DIR && venv/bin/python test_backup.py"
 }
 
+# Проверка времени и планировщика
+check_backup_time() {
+    log "Проверка времени и планировщика резервного копирования..."
+    sudo -u telegram bash -c "cd $BOT_DIR && venv/bin/python check_backup_time.py"
+}
+
 # Очистка логов
 clean_logs() {
     log "Очистка логов..."
@@ -281,6 +287,7 @@ show_help() {
     echo "  install-deps- Установить Python зависимости"
     echo "  check-db    - Проверить состояние базы данных"
     echo "  test-backup - Протестировать резервное копирование"
+    echo "  check-time  - Проверить время и планировщик"
     echo "  clean-logs  - Очистить старые логи"
     echo "  help        - Показать эту справку"
     echo ""
@@ -333,6 +340,9 @@ case "$1" in
         ;;
     test-backup)
         test_backup
+        ;;
+    check-time)
+        check_backup_time
         ;;
     clean-logs)
         clean_logs
