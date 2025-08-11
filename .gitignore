@@ -3,6 +3,7 @@
 *.db
 *.sqlite
 *.sqlite3
+endless-codex.json
 
 # Python
 __pycache__/
