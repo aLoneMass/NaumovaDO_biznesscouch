@@ -11,6 +11,7 @@ from telegram.ext import (
 from database import Database
 from keyboards import get_contact_keyboard, get_request_actions_keyboard
 from backup_service import BackupService
+from google_sheets_service import GoogleSheetsService
 
 # Загрузка переменных окружения
 load_dotenv()
@@ -241,6 +242,49 @@ async def send_media_files(bot, chat_id, users):
             except Exception as e:
                 logger.error(f"Ошибка при отправке медиафайла для пользователя {user_data[1]}: {e}")
 
+async def export_to_sheets_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Команда экспорта данных в Google Sheets"""
+    user = update.effective_user
+    
+    if user.id not in ADMINS:
+        await update.message.reply_text("❌ У вас нет прав для выполнения этой команды.")
+        return
+    
+    await update.message.reply_text("🔄 Начинаю экспорт данных в Google Sheets...")
+    
+    try:
+        # Инициализируем сервис Google Sheets
+        sheets_service = GoogleSheetsService()
+        
+        # Получаем информацию о таблице
+        sheet_info = sheets_service.get_sheet_info()
+        if sheet_info:
+            await update.message.reply_text(
+                f"📊 Таблица: {sheet_info.get('title', 'Неизвестно')}\n"
+                f"🔗 Ссылка: {sheet_info.get('url', 'Недоступна')}"
+            )
+        
+        # Получаем всех пользователей из базы
+        users = db.get_all_users()
+        await update.message.reply_text(f"👥 Найдено {len(users)} пользователей в базе данных")
+        
+        if not users:
+            await update.message.reply_text("ℹ️ Нет пользователей для экспорта")
+            return
+        
+        # Экспортируем данные
+        success = sheets_service.export_users_to_sheets(users)
+        
+        if success:
+            await update.message.reply_text("✅ Экспорт завершен успешно!")
+        else:
+            await update.message.reply_text("❌ Ошибка при экспорте данных")
+            
+    except Exception as e:
+        error_msg = f"❌ Ошибка экспорта: {str(e)}"
+        logger.error(error_msg)
+        await update.message.reply_text(error_msg)
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Команда помощи"""
     user = update.effective_user
@@ -251,6 +295,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             "Для администраторов:\n"
             "• /show_users - показать всех пользователей\n"
             "• /show_today - показать сегодняшние регистрации\n"
+            "• /export_sheets - экспорт в Google Sheets\n"
             "• /help - показать эту справку\n\n"
             "Для пользователей:\n"
             "• /start - начать работу с ботом"
@@ -301,6 +346,7 @@ def main() -> None:
     application.add_handler(CallbackQueryHandler(handle_callback))
     application.add_handler(CommandHandler("show_users", show_users_command))
     application.add_handler(CommandHandler("show_today", show_today_command))
+    application.add_handler(CommandHandler("export_sheets", export_to_sheets_command))
     application.add_handler(CommandHandler("help", help_command))
     
     # Запускаем сервис резервных копий
