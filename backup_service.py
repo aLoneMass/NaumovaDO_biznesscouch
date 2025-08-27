@@ -6,7 +6,7 @@ import os
 import time
 from datetime import datetime, date
 from dotenv import load_dotenv
-from backup_service import BackupService
+#from backup_service import BackupService
 
 # Загрузка переменных окружения
 load_dotenv()
