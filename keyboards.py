@@ -15,18 +15,4 @@ def get_request_actions_keyboard():
             InlineKeyboardButton("✅ Завершить", callback_data="finish")
         ]
     ]
-    return InlineKeyboardMarkup(keyboard)
-
-def get_admin_keyboard():
-    """Клавиатура для администраторов"""
-    keyboard = [
-        [
-            InlineKeyboardButton("👥 Все пользователи", callback_data="admin_show_users"),
-            InlineKeyboardButton("📅 Сегодняшние", callback_data="admin_show_today")
-        ],
-        [
-            InlineKeyboardButton("📊 Выгрузить в Excel", callback_data="admin_export_sheets"),
-            InlineKeyboardButton("❓ Помощь", callback_data="admin_help")
-        ]
-    ]
     return InlineKeyboardMarkup(keyboard) 

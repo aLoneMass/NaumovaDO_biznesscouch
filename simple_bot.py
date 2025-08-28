@@ -13,7 +13,7 @@ from telegram.ext import (
 )
 
 from database import Database
-from keyboards import get_contact_keyboard, get_request_actions_keyboard, get_admin_keyboard
+from keyboards import get_contact_keyboard, get_request_actions_keyboard
 from backup_service import BackupService
 from google_sheets_service import GoogleSheetsService
 
@@ -158,18 +158,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await query.edit_message_text("✅ Спасибо за обращение! До свидания!")
         return ConversationHandler.END
     
-    # Обработка кнопок администратора
-    elif query.data == "admin_show_users":
-        await handle_admin_show_users(query, context)
-    
-    elif query.data == "admin_show_today":
-        await handle_admin_show_today(query, context)
-    
-    elif query.data == "admin_export_sheets":
-        await handle_admin_export_sheets(query, context)
-    
-    elif query.data == "admin_help":
-        await handle_admin_help(query, context)
+
 
 async def show_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Команда для показа всех пользователей"""
@@ -455,9 +444,9 @@ def main() -> None:
     # Создаем приложение
     application = Application.builder().token(BOT_TOKEN).build()
     
-    # Настраиваем команды бота для встроенного меню
-    async def setup_bot_commands():
-        """Настройка команд бота для встроенного меню"""
+    # Настраиваем команды бота через post_init
+    async def post_init(application):
+        """Функция, выполняемая после инициализации приложения"""
         commands = [
             BotCommand("start", "🚀 Начать работу с ботом"),
             BotCommand("help", "❓ Справка по командам")
@@ -475,12 +464,8 @@ def main() -> None:
         await application.bot.set_my_commands(commands)
         logger.info("✅ Команды бота настроены")
     
-    # Настраиваем команды при запуске
-    import asyncio
-    try:
-        asyncio.run(setup_bot_commands())
-    except Exception as e:
-        logger.warning(f"⚠️ Не удалось настроить команды бота: {e}")
+    # Устанавливаем post_init функцию
+    application.post_init = post_init
     
     # Создаем обработчик разговора для обычных пользователей
     conv_handler = ConversationHandler(
@@ -518,6 +503,8 @@ def main() -> None:
         logger.info("✅ Сервис резервных копий запущен")
     else:
         logger.warning("⚠️ Сервис резервных копий не инициализирован (отсутствует токен или BACKUPTO)")
+    
+    # Команды бота будут настроены после запуска приложения
     
     # Запускаем бота
     print("🤖 Бот запущен...")
