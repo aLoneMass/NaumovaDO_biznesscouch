@@ -70,7 +70,7 @@ Type=simple
 User=telegram
 WorkingDirectory=$BOT_DIR
 Environment=PATH=$BOT_DIR/venv/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=$BOT_DIR/venv/bin/python $BOT_DIR/bot.py
+ExecStart=$BOT_DIR/venv/bin/python $BOT_DIR/simple_bot.py
 Restart=always
 RestartSec=10
 
