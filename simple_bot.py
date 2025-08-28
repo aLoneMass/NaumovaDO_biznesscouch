@@ -38,10 +38,13 @@ BOT_TOKEN = os.getenv('BOT_TOKEN')
 ADMINS = [int(admin_id.strip()) for admin_id in os.getenv('ADMINS', '').split(',') if admin_id.strip()]
 BACKUPTO = os.getenv('BACKUPTO')
 
+# Путь к базе данных
+DB_PATH = "/opt/telegram_bots/NaumovaDO_biznesscouch/naumovado.db"
+
 # Инициализация сервиса резервных копий
 backup_service = None
 if BOT_TOKEN and BACKUPTO:
-    backup_service = BackupService(BOT_TOKEN, BACKUPTO)
+    backup_service = BackupService(BOT_TOKEN, BACKUPTO, DB_PATH)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обработчик команды /start"""
