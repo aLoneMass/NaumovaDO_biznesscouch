@@ -1,3 +1,7 @@
+#!/usr/bin/env python3
+"""
+Telegram bot for NaumovaDO business coach
+"""
 import os
 import logging
 from datetime import datetime
