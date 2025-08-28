@@ -6,7 +6,7 @@ import os
 import logging
 from datetime import datetime
 from dotenv import load_dotenv
-from telegram import Update, ReplyKeyboardRemove, BotCommand
+from telegram import Update, ReplyKeyboardRemove, BotCommand, BotCommandScopeChat
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
     filters, ContextTypes, ConversationHandler
@@ -435,6 +435,41 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     
     await update.message.reply_text(help_text)
 
+async def setup_bot_commands(application):
+    """Настройка команд бота для разных типов пользователей"""
+    try:
+        # Базовые команды для всех пользователей
+        basic_commands = [
+            BotCommand("start", "🚀 Начать работу с ботом"),
+            BotCommand("help", "❓ Справка по командам")
+        ]
+        
+        # Команды для администраторов
+        admin_commands = [
+            BotCommand("show_users", "👥 Показать всех пользователей"),
+            BotCommand("show_today", "📅 Сегодняшние регистрации"),
+            BotCommand("export_sheets", "📊 Выгрузить базу в Excel")
+        ]
+        
+        # Устанавливаем базовые команды для всех пользователей
+        await application.bot.set_my_commands(basic_commands)
+        
+        # Устанавливаем команды для администраторов (они будут видны только им)
+        if ADMINS:
+            for admin_id in ADMINS:
+                try:
+                    await application.bot.set_my_commands(
+                        basic_commands + admin_commands,
+                        scope=BotCommandScopeChat(chat_id=admin_id)
+                    )
+                except Exception as e:
+                    logger.warning(f"Не удалось установить команды для админа {admin_id}: {e}")
+        
+        logger.info("✅ Команды бота настроены")
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка настройки команд: {e}")
+
 def main() -> None:
     """Основная функция запуска бота"""
     if not BOT_TOKEN:
@@ -444,7 +479,8 @@ def main() -> None:
     # Создаем приложение
     application = Application.builder().token(BOT_TOKEN).build()
     
-    # Команды бота будут настроены при запуске
+    # Настраиваем команды бота через post_init
+    application.post_init = setup_bot_commands
     
     # Создаем обработчик разговора для обычных пользователей
     conv_handler = ConversationHandler(
