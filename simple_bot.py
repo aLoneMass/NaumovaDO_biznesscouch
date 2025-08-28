@@ -483,52 +483,36 @@ def main() -> None:
     else:
         logger.warning("⚠️ Сервис резервных копий не инициализирован (отсутствует токен или BACKUPTO)")
     
-    # Настраиваем команды бота для встроенного меню
-    try:
-        commands = [
-            BotCommand("start", "🚀 Начать работу с ботом"),
-            BotCommand("help", "❓ Справка по командам")
-        ]
-        
-        # Добавляем команды для администраторов
-        if ADMINS:
-            admin_commands = [
-                BotCommand("show_users", "👥 Показать всех пользователей"),
-                BotCommand("show_today", "📅 Сегодняшние регистрации"),
-                BotCommand("export_sheets", "📊 Выгрузить базу в Excel")
-            ]
-            commands.extend(admin_commands)
-        
-        # Настраиваем команды синхронно
-        import asyncio
-        import threading
-        
-        def setup_commands():
-            """Настройка команд в отдельном потоке"""
-            try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(application.bot.set_my_commands(commands))
-                logger.info("✅ Команды бота настроены")
-            except Exception as e:
-                logger.error(f"❌ Ошибка настройки команд: {e}")
-            finally:
-                loop.close()
-        
-        # Запускаем настройку команд в отдельном потоке
-        thread = threading.Thread(target=setup_commands)
-        thread.daemon = True
-        thread.start()
-        
-        # Ждем немного для завершения настройки команд
-        import time
-        time.sleep(2)
-        
-    except Exception as e:
-        logger.warning(f"⚠️ Не удалось настроить команды бота: {e}")
-    
     # Запускаем бота
     print("🤖 Бот запущен...")
+    
+    # Настраиваем команды бота после запуска
+    async def setup_commands_after_start():
+        """Настройка команд бота после запуска"""
+        try:
+            commands = [
+                BotCommand("start", "🚀 Начать работу с ботом"),
+                BotCommand("help", "❓ Справка по командам")
+            ]
+            
+            # Добавляем команды для администраторов
+            if ADMINS:
+                admin_commands = [
+                    BotCommand("show_users", "👥 Показать всех пользователей"),
+                    BotCommand("show_today", "📅 Сегодняшние регистрации"),
+                    BotCommand("export_sheets", "📊 Выгрузить базу в Excel")
+                ]
+                commands.extend(admin_commands)
+            
+            await application.bot.set_my_commands(commands)
+            logger.info("✅ Команды бота настроены")
+        except Exception as e:
+            logger.warning(f"⚠️ Не удалось настроить команды бота: {e}")
+    
+    # Запускаем настройку команд в фоне
+    import asyncio
+    asyncio.create_task(setup_commands_after_start())
+    
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
