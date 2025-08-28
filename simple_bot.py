@@ -13,7 +13,7 @@ from telegram.ext import (
 )
 
 from database import Database
-from keyboards import get_contact_keyboard, get_request_actions_keyboard
+from keyboards import get_contact_keyboard, get_request_actions_keyboard, get_admin_keyboard
 from backup_service import BackupService
 from google_sheets_service import GoogleSheetsService
 
@@ -54,9 +54,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if user.id in ADMINS:
         await update.message.reply_text(
             "👋 Добро пожаловать в панель администратора!\n\n"
-            "Используйте команды:\n"
-            "• /show_users - показать всех пользователей\n"
-            "• /show_today - показать сегодняшние регистрации"
+            "Используйте кнопки ниже для управления ботом:",
+            reply_markup=get_admin_keyboard()
         )
         return ConversationHandler.END
     
@@ -155,6 +154,19 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     elif query.data == "finish":
         await query.edit_message_text("✅ Спасибо за обращение! До свидания!")
         return ConversationHandler.END
+    
+    # Обработка кнопок администратора
+    elif query.data == "admin_show_users":
+        await handle_admin_show_users(query, context)
+    
+    elif query.data == "admin_show_today":
+        await handle_admin_show_today(query, context)
+    
+    elif query.data == "admin_export_sheets":
+        await handle_admin_export_sheets(query, context)
+    
+    elif query.data == "admin_help":
+        await handle_admin_help(query, context)
 
 async def show_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Команда для показа всех пользователей"""
@@ -292,6 +304,117 @@ async def export_to_sheets_command(update: Update, context: ContextTypes.DEFAULT
         logger.error(error_msg)
         await update.message.reply_text(error_msg)
 
+async def handle_admin_show_users(query, context):
+    """Обработчик кнопки 'Все пользователи' для администраторов"""
+    users = db.get_all_users()
+    if users:
+        message = "👥 Все пользователи:\n\n"
+        for user_data in users:
+            message += f"ID: {user_data[1]}\n"
+            message += f"Имя: {user_data[2]} {user_data[3] or ''}\n"
+            message += f"Телефон: {user_data[4]}\n"
+            message += f"Регистрация: {user_data[5]}\n"
+            message += f"Запрос: {user_data[6] or 'Не указан'}\n"
+            
+            if user_data[7]:  # request_type
+                message += f"Тип контента: {user_data[7]}\n"
+            
+            message += "─" * 30 + "\n"
+        
+        # Разбиваем на части, если сообщение слишком длинное
+        if len(message) > 4096:
+            for i in range(0, len(message), 4096):
+                await query.edit_message_text(message[i:i+4096])
+        else:
+            await query.edit_message_text(message)
+        
+        # Отправляем медиафайлы отдельно
+        await send_media_files(context.bot, query.message.chat_id, users)
+    else:
+        await query.edit_message_text("📭 Пользователей пока нет.")
+
+async def handle_admin_show_today(query, context):
+    """Обработчик кнопки 'Сегодняшние' для администраторов"""
+    users = db.get_today_registrations()
+    if users:
+        message = f"📅 Регистрации за {datetime.now().strftime('%d.%m.%Y')}:\n\n"
+        for user_data in users:
+            message += f"ID: {user_data[1]}\n"
+            message += f"Имя: {user_data[2]} {user_data[3] or ''}\n"
+            message += f"Телефон: {user_data[4]}\n"
+            message += f"Время: {user_data[5]}\n"
+            message += f"Запрос: {user_data[6] or 'Не указан'}\n"
+            
+            if user_data[7]:  # request_type
+                message += f"Тип контента: {user_data[7]}\n"
+            
+            message += "─" * 30 + "\n"
+        
+        if len(message) > 4096:
+            for i in range(0, len(message), 4096):
+                await query.edit_message_text(message[i:i+4096])
+        else:
+            await query.edit_message_text(message)
+        
+        # Отправляем медиафайлы отдельно
+        await send_media_files(context.bot, query.message.chat_id, users)
+    else:
+        await query.edit_message_text("📭 Сегодня новых регистраций нет.")
+
+async def handle_admin_export_sheets(query, context):
+    """Обработчик кнопки 'Выгрузить в Excel' для администраторов"""
+    await query.edit_message_text("🔄 Начинаю экспорт данных в Google Sheets...")
+    
+    try:
+        # Инициализируем сервис Google Sheets
+        sheets_service = GoogleSheetsService()
+        
+        # Получаем информацию о таблице
+        sheet_info = sheets_service.get_sheet_info()
+        if sheet_info:
+            await query.edit_message_text(
+                f"📊 Таблица: {sheet_info.get('title', 'Неизвестно')}\n"
+                f"🔗 Ссылка: {sheet_info.get('url', 'Недоступна')}\n\n"
+                "🔄 Экспортирую данные..."
+            )
+        
+        # Получаем всех пользователей из базы
+        users = db.get_all_users()
+        await query.edit_message_text(f"👥 Найдено {len(users)} пользователей в базе данных\n\n🔄 Экспортирую...")
+        
+        if not users:
+            await query.edit_message_text("ℹ️ Нет пользователей для экспорта")
+            return
+        
+        # Экспортируем данные
+        success = sheets_service.export_users_to_sheets(users)
+        
+        if success:
+            await query.edit_message_text(
+                "✅ Экспорт завершен успешно!\n\n"
+                f"📊 Данные выгружены в таблицу: {sheet_info.get('title', 'Неизвестно')}\n"
+                f"🔗 Ссылка: {sheet_info.get('url', 'Недоступна')}"
+            )
+        else:
+            await query.edit_message_text("❌ Ошибка при экспорте данных")
+            
+    except Exception as e:
+        error_msg = f"❌ Ошибка экспорта: {str(e)}"
+        logger.error(error_msg)
+        await query.edit_message_text(error_msg)
+
+async def handle_admin_help(query, context):
+    """Обработчик кнопки 'Помощь' для администраторов"""
+    help_text = (
+        "🤖 Помощь по управлению ботом:\n\n"
+        "👥 Все пользователи - показать всех зарегистрированных пользователей\n"
+        "📅 Сегодняшние - показать регистрации за сегодня\n"
+        "📊 Выгрузить в Excel - экспортировать новых пользователей в Google Sheets\n"
+        "❓ Помощь - показать эту справку\n\n"
+        "💡 Используйте кнопки выше для управления ботом"
+    )
+    await query.edit_message_text(help_text)
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Команда помощи"""
     user = update.effective_user
@@ -300,10 +423,12 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         help_text = (
             "🤖 Помощь по командам бота:\n\n"
             "Для администраторов:\n"
+            "• /start - открыть панель управления с кнопками\n"
             "• /show_users - показать всех пользователей\n"
             "• /show_today - показать сегодняшние регистрации\n"
             "• /export_sheets - экспорт в Google Sheets\n"
             "• /help - показать эту справку\n\n"
+            "💡 Рекомендуется использовать /start для удобного управления через кнопки\n\n"
             "Для пользователей:\n"
             "• /start - начать работу с ботом"
         )
