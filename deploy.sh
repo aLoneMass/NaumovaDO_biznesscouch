@@ -188,6 +188,59 @@ logs() {
     journalctl -u $SERVICE_NAME -f
 }
 
+# Обновление через Git
+git_update() {
+    log "Обновление бота через Git..."
+    
+    # Остановка службы
+    systemctl stop $SERVICE_NAME
+    
+    # Проверяем, есть ли Git репозиторий
+    if [ ! -d "$BOT_DIR/.git" ]; then
+        error "❌ Git репозиторий не найден в $BOT_DIR"
+        log "Сначала выполните установку бота через git clone"
+        systemctl start $SERVICE_NAME
+        exit 1
+    fi
+    
+    # Переходим в директорию бота
+    cd $BOT_DIR
+    
+    # Создаем резервную копию
+    cd /opt/telegram_bots
+    cp -r NaumovaDO_biznesscouch NaumovaDO_biznesscouch_backup_$(date +%Y%m%d_%H%M%S)
+    log "Создана резервная копия"
+    
+    # Возвращаемся в директорию бота и обновляем
+    cd $BOT_DIR
+    log "Выполняем git pull origin main..."
+    git pull origin main
+    
+    if [ $? -eq 0 ]; then
+        log "✅ Git pull выполнен успешно"
+    else
+        error "❌ Ошибка при выполнении git pull"
+        log "Восстанавливаем из резервной копии..."
+        cd /opt/telegram_bots
+        rm -rf NaumovaDO_biznesscouch
+        mv NaumovaDO_biznesscouch_backup_$(date +%Y%m%d_%H%M%S) NaumovaDO_biznesscouch
+        systemctl start $SERVICE_NAME
+        exit 1
+    fi
+    
+    # Устанавливаем зависимости
+    if [ -d "venv" ]; then
+        log "Обновляем Python зависимости..."
+        venv/bin/pip install -r requirements.txt
+    fi
+    
+    # Запускаем службу
+    systemctl start $SERVICE_NAME
+    
+    log "Обновление через Git завершено!"
+    systemctl status $SERVICE_NAME --no-pager
+}
+
 # Обновление бота
 update() {
     log "Обновление бота..."
@@ -195,23 +248,39 @@ update() {
     # Остановка службы
     systemctl stop $SERVICE_NAME
     
-    # Определяем текущую директорию (откуда запускается скрипт)
-    CURRENT_DIR=$(pwd)
-    
-    # Копирование новых файлов (только если мы не в целевой директории)
-    if [ "$CURRENT_DIR" != "$BOT_DIR" ]; then
-        # Резервная копия только при реальном обновлении
-        if [ -d "$BOT_DIR" ]; then
-            cp -r $BOT_DIR ${BOT_DIR}_backup_$(date +%Y%m%d_%H%M%S)
-            log "Создана резервная копия"
+    # Проверяем, есть ли Git репозиторий в целевой директории
+    if [ -d "$BOT_DIR/.git" ]; then
+        log "Найден Git репозиторий, обновляем через git pull..."
+        cd $BOT_DIR
+        git pull origin main
+        if [ $? -eq 0 ]; then
+            log "✅ Git pull выполнен успешно"
+        else
+            error "❌ Ошибка при выполнении git pull"
+            systemctl start $SERVICE_NAME
+            exit 1
         fi
-        
-        log "Копирование файлов из $CURRENT_DIR в $BOT_DIR..."
-        cp -r * $BOT_DIR/
-        chown -R telegram:telegram $BOT_DIR
     else
-        log "⚠️ Обновление из целевой директории - пропускаем копирование файлов"
-        log "Для обновления запустите команду из директории с исходными файлами"
+        # Если Git нет, проверяем, есть ли исходные файлы в текущей директории
+        CURRENT_DIR=$(pwd)
+        if [ "$CURRENT_DIR" != "$BOT_DIR" ] && [ -f "$CURRENT_DIR/simple_bot.py" ]; then
+            # Резервная копия
+            if [ -d "$BOT_DIR" ]; then
+                cp -r $BOT_DIR ${BOT_DIR}_backup_$(date +%Y%m%d_%H%M%S)
+                log "Создана резервная копия"
+            fi
+            
+            log "Копирование файлов из $CURRENT_DIR в $BOT_DIR..."
+            cp -r * $BOT_DIR/
+            chown -R telegram:telegram $BOT_DIR
+        else
+            log "⚠️ Не найден Git репозиторий или исходные файлы"
+            log "Для обновления:"
+            log "  1. Выполните git pull в директории $BOT_DIR, или"
+            log "  2. Запустите скрипт из директории с исходными файлами"
+            systemctl start $SERVICE_NAME
+            exit 1
+        fi
     fi
     
     # Создание виртуального окружения если его нет
@@ -304,6 +373,7 @@ show_help() {
     echo "  status      - Показать статус службы"
     echo "  logs        - Показать логи в реальном времени"
     echo "  update      - Обновить бота"
+    echo "  git-update  - Обновить бота через Git"
     echo "  install-deps- Установить Python зависимости"
     echo "  check-db    - Проверить состояние базы данных"
     echo "  test-backup - Протестировать резервное копирование"
@@ -351,6 +421,10 @@ case "$1" in
     update)
         check_sudo
         update
+        ;;
+    git-update)
+        check_sudo
+        git_update
         ;;
     install-deps)
         check_sudo
